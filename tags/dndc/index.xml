@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>DNDC on wave&#39;s blog</title>
+    <link>http://localhost:1313/tags/dndc/</link>
+    <description>Recent content in DNDC on wave&#39;s blog</description>
+    <generator>Hugo -- 0.154.3</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Sat, 10 Jan 2026 15:00:00 +0800</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/dndc/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>🚜 农业模型的硬核进化：从传统 DNDC 到可微化 CUDA 加速</title>
+      <link>http://localhost:1313/projects/dndc-cuda-optimization/</link>
+      <pubDate>Sat, 10 Jan 2026 15:00:00 +0800</pubDate>
+      <guid>http://localhost:1313/projects/dndc-cuda-optimization/</guid>
+      <description>为了解决传统农业模型运行慢、难以参数优化的问题，我尝试基于 Python 和 CUDA 重构 DNDC 模型，实现了可微化与 GPU 加速，为 AI 与机理模型的耦合铺平道路。</description>
+    </item>
+  </channel>
+</rss>

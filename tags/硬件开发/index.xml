@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>硬件开发 on wave&#39;s blog</title>
+    <link>http://localhost:1313/tags/%E7%A1%AC%E4%BB%B6%E5%BC%80%E5%8F%91/</link>
+    <description>Recent content in 硬件开发 on wave&#39;s blog</description>
+    <generator>Hugo -- 0.154.3</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Sat, 10 Jan 2026 14:00:00 +0800</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/%E7%A1%AC%E4%BB%B6%E5%BC%80%E5%8F%91/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>基于 AI 的智能眼镜开发实录</title>
+      <link>http://localhost:1313/projects/ai-glasses/</link>
+      <pubDate>Sat, 10 Jan 2026 14:00:00 +0800</pubDate>
+      <guid>http://localhost:1313/projects/ai-glasses/</guid>
+      <description>这是一个集成了计算机视觉的智能穿戴项目，旨在通过轻量化硬件实现实时的物体识别与辅助功能。</description>
+    </item>
+  </channel>
+</rss>

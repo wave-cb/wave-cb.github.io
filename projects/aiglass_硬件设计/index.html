@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto" data-theme="auto">
+
+<head><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>👓 AI视障眼镜的硬件设计 | wave&#39;s blog</title>
+<meta name="keywords" content="嵌入式, 计算机视觉, ESP32, YOLO, LLM, CUDA">
+<meta name="description" content="本文从硬件架构、驱动代码、服务端三个部分进行讲解，详细介绍了基于 ESP32-S3 的音视频流传输实现。">
+<meta name="author" content="Wave-CB">
+<link rel="canonical" href="https://wave-cb.github.io/projects/aiglass_%E7%A1%AC%E4%BB%B6%E8%AE%BE%E8%AE%A1/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.css" rel="preload stylesheet" as="style">
+<link rel="icon" href="https://wave-cb.github.io/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="https://wave-cb.github.io/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://wave-cb.github.io/favicon-32x32.png">
+<link rel="apple-touch-icon" href="https://wave-cb.github.io/apple-touch-icon.png">
+<link rel="mask-icon" href="https://wave-cb.github.io/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="https://wave-cb.github.io/projects/aiglass_%E7%A1%AC%E4%BB%B6%E8%AE%BE%E8%AE%A1/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+                color-scheme: dark;
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .toc {
+                background: var(--entry);
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            .list::-webkit-scrollbar-thumb {
+                border-color: var(--code-bg);
+            }
+        }
+
+    </style>
+</noscript>
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.querySelector("html").dataset.theme = 'dark';
+    } else if (localStorage.getItem("pref-theme") === "light") {
+       document.querySelector("html").dataset.theme = 'light';
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.querySelector("html").dataset.theme = 'dark';
+    } else {
+        document.querySelector("html").dataset.theme = 'light';
+    }
+
+</script><meta property="og:url" content="https://wave-cb.github.io/projects/aiglass_%E7%A1%AC%E4%BB%B6%E8%AE%BE%E8%AE%A1/">
+  <meta property="og:site_name" content="wave&#39;s blog">
+  <meta property="og:title" content="👓 AI视障眼镜的硬件设计">
+  <meta property="og:description" content="本文从硬件架构、驱动代码、服务端三个部分进行讲解，详细介绍了基于 ESP32-S3 的音视频流传输实现。">
+  <meta property="og:locale" content="zh-cn">
+  <meta property="og:type" content="article">
+    <meta property="article:section" content="projects">
+    <meta property="article:published_time" content="2026-02-04T14:30:00+08:00">
+    <meta property="article:modified_time" content="2026-02-04T14:30:00+08:00">
+    <meta property="article:tag" content="嵌入式">
+    <meta property="article:tag" content="计算机视觉">
+    <meta property="article:tag" content="ESP32">
+    <meta property="article:tag" content="YOLO">
+    <meta property="article:tag" content="LLM">
+    <meta property="article:tag" content="CUDA">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="👓 AI视障眼镜的硬件设计">
+<meta name="twitter:description" content="本文从硬件架构、驱动代码、服务端三个部分进行讲解，详细介绍了基于 ESP32-S3 的音视频流传输实现。">
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "🛠️ 项目",
+      "item": "https://wave-cb.github.io/projects/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "👓 AI视障眼镜的硬件设计",
+      "item": "https://wave-cb.github.io/projects/aiglass_%E7%A1%AC%E4%BB%B6%E8%AE%BE%E8%AE%A1/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "👓 AI视障眼镜的硬件设计",
+  "name": "👓 AI视障眼镜的硬件设计",
+  "description": "本文从硬件架构、驱动代码、服务端三个部分进行讲解，详细介绍了基于 ESP32-S3 的音视频流传输实现。",
+  "keywords": [
+    "嵌入式", "计算机视觉", "ESP32", "YOLO", "LLM", "CUDA"
+  ],
+  "articleBody": "🛠️ 硬件架构 核心清单 主控：ESP32-S3 CAM 开发板 麦克风：INMP441 全向麦克风 功放/扬声器：MAX98357A I2S 功放 + 8Ω 1W 小喇叭 其他：3D 打印支架、锂电池 引脚定义 注意：由于 ESP32 引脚复用（例如 GPIO 42 和 GND），在设计验证阶段建议使用面包板扩展引脚，验证无误后进行焊接集成。\n[ ESP32-S3 开发板 ] | +---- 3.3V ---------\u003e [INMP441 VDD] +---- GND ----------+-\u003e [INMP441 GND] \u0026 [L/R] | | +---- 5V (VBUS) ----+-\u003e [MAX98357 Vin] | | +---- GND ----------+-\u003e [MAX98357 GND] | [数据线] GPIO 39 \u003c---------------------- [INMP441 SD] GPIO 40 ----------------------\u003e [MAX98357 DIN] [时钟线 - 关键！这里要分叉] GPIO 41 ------------------+---\u003e [INMP441 SCK] | +---\u003e [MAX98357 BCLK] GPIO 42 ------------------+---\u003e [INMP441 WS] | +---\u003e [MAX98357 LRC] 驱动代码 代码块 compile.ino\n#include \"esp_camera.h\" #include #include #include #include using namespace websockets; // ================= 配置区 ================= const char* ssid = \"502\"; const char* password = \"sxz20220121\"; const char* websocket_server_host = \"192.168.1.101\"; const uint16_t websocket_server_port = 8888; // ================= RGB 灯配置 ================= #define RGB_BUILTIN_PIN 48 Adafruit_NeoPixel strip(1, RGB_BUILTIN_PIN, NEO_GRB + NEO_KHZ800); // ================= 摄像头引脚 (保持不变) ================= #define PWDN_GPIO_NUM -1 #define RESET_GPIO_NUM -1 #define XCLK_GPIO_NUM 15 #define SIOD_GPIO_NUM 4 #define SIOC_GPIO_NUM 5 #define Y9_GPIO_NUM 16 #define Y8_GPIO_NUM 17 #define Y7_GPIO_NUM 18 #define Y6_GPIO_NUM 12 #define Y5_GPIO_NUM 10 #define Y4_GPIO_NUM 8 #define Y3_GPIO_NUM 9 #define Y2_GPIO_NUM 11 #define VSYNC_GPIO_NUM 6 #define HREF_GPIO_NUM 7 #define PCLK_GPIO_NUM 13 // ================= 音频 I2S 引脚 (保持不变) ================= #define I2S_WS 42 #define I2S_SD 40 // 功放输入 (DIN) #define I2S_SD_IN 39 // 麦克风输出 (SD) #define I2S_SCK 41 #define I2S_PORT I2S_NUM_0 #define SAMPLE_RATE 16000 WebsocketsClient client; // ================= 全局变量 ================= // 音频缓冲区：增加到 1024 字节以减少发送频率，提高网络效率 const int i2s_buffer_len = 1024; int16_t sBuffer[i2s_buffer_len]; // 数据包头定义 const uint8_t HEADER_VIDEO = 0x01; const uint8_t HEADER_AUDIO = 0x02; // --- I2S 初始化函数 --- void setupAudio() { i2s_config_t i2s_config = { .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX), .sample_rate = SAMPLE_RATE, .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT, .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, .communication_format = I2S_COMM_FORMAT_STAND_I2S, .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1, .dma_buf_count = 8, .dma_buf_len = 64, .use_apll = false, .tx_desc_auto_clear = true, .fixed_mclk = 0 }; i2s_pin_config_t pin_config = { .bck_io_num = I2S_SCK, .ws_io_num = I2S_WS, .data_out_num = I2S_SD, .data_in_num = I2S_SD_IN }; if (i2s_driver_install(I2S_PORT, \u0026i2s_config, 0, NULL) != ESP_OK) return; if (i2s_set_pin(I2S_PORT, \u0026pin_config) != ESP_OK) return; i2s_zero_dma_buffer(I2S_PORT); } // --- WebSocket 收到消息回调 (用于播放服务器发来的音频) --- void onMessageCallback(WebsocketsMessage message) { if (message.isBinary()) { // 假设服务器直接发回 PCM 音频数据 const char* data = message.c_str(); size_t len = message.length(); size_t bytesOut; // 将收到的数据写入 I2S (扬声器) i2s_write(I2S_PORT, data, len, \u0026bytesOut, 0); } } void setup() { Serial.begin(115200); // 1. 关灯 strip.begin(); strip.setBrightness(0); strip.setPixelColor(0, strip.Color(0, 0, 0)); strip.show(); // 2. 摄像头初始化 camera_config_t config; config.ledc_channel = LEDC_CHANNEL_0; config.ledc_timer = LEDC_TIMER_0; config.pin_d0 = Y2_GPIO_NUM; config.pin_d1 = Y3_GPIO_NUM; config.pin_d2 = Y4_GPIO_NUM; config.pin_d3 = Y5_GPIO_NUM; config.pin_d4 = Y6_GPIO_NUM; config.pin_d5 = Y7_GPIO_NUM; config.pin_d6 = Y8_GPIO_NUM; config.pin_d7 = Y9_GPIO_NUM; config.pin_xclk = XCLK_GPIO_NUM; config.pin_pclk = PCLK_GPIO_NUM; config.pin_vsync = VSYNC_GPIO_NUM; config.pin_href = HREF_GPIO_NUM; config.pin_sccb_sda = SIOD_GPIO_NUM; config.pin_sccb_scl = SIOC_GPIO_NUM; config.pin_pwdn = PWDN_GPIO_NUM; config.pin_reset = RESET_GPIO_NUM; config.xclk_freq_hz = 10000000; config.frame_size = FRAMESIZE_QVGA; config.pixel_format = PIXFORMAT_JPEG; config.grab_mode = CAMERA_GRAB_LATEST; config.fb_location = CAMERA_FB_IN_PSRAM; config.jpeg_quality = 30; config.fb_count = 2; if (esp_camera_init(\u0026config) != ESP_OK) { Serial.println(\"Cam Fail\"); return; } // 3. 初始化音频 setupAudio(); // 4. WiFi WiFi.mode(WIFI_STA); WiFi.begin(ssid, password); while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print(\".\"); } // 注册回调接收服务器音频 client.onMessage(onMessageCallback); client.connect(websocket_server_host, websocket_server_port, \"/\"); } void loop() { // 保持 WebSocket 活跃 if (client.available()) { client.poll(); } else { delay(500); client.connect(websocket_server_host, websocket_server_port, \"/\"); return; } // ================= 任务 A: 发送音频 (高优先级) ================= size_t bytesIn = 0; // 尝试非阻塞读取麦克风数据 esp_err_t result = i2s_read(I2S_PORT, \u0026sBuffer, i2s_buffer_len * sizeof(int16_t), \u0026bytesIn, 0); if (result == ESP_OK \u0026\u0026 bytesIn \u003e 0) { // 创建数据包: [1字节类型头] + [PCM数据] // 动态分配内存以合并头和数据 (ESP32有足够RAM处理这个小包) uint8_t* payload = new uint8_t[bytesIn + 1]; payload[0] = HEADER_AUDIO; // 标记为音频 memcpy(payload + 1, sBuffer, bytesIn); client.sendBinary((const char*)payload, bytesIn + 1); delete[] payload; // 记得释放内存 } // ================= 任务 B: 发送视频 (低优先级) ================= static unsigned long lastVideoTime = 0; // 控制帧率为 10FPS (100ms间隔)，给音频留出带宽 if (millis() - lastVideoTime \u003e 100) { camera_fb_t * fb = esp_camera_fb_get(); if (fb) { // 创建数据包: [1字节类型头] + [JPEG数据] // 注意：视频数据较大，频繁 malloc 可能会导致碎片，但ArduinoWebsockets不支持分段发送 uint8_t* videoPayload = new uint8_t[fb-\u003elen + 1]; videoPayload[0] = HEADER_VIDEO; // 标记为视频 memcpy(videoPayload + 1, fb-\u003ebuf, fb-\u003elen); client.sendBinary((const char*)videoPayload, fb-\u003elen + 1); delete[] videoPayload; esp_camera_fb_return(fb); } lastVideoTime = millis(); } } 📖 使用说明 1. 创建工程 打开 Arduino IDE，点击左上角菜单栏 File -\u003e New Sketch，将文件命名为 compile.ino，并将上述驱动代码完整复制进去。\n2. 硬件连接 点击菜单栏 Tools，在 Board 选项中选择 esp32 -\u003e ESP32S3 Dev Module。 此时将单片机通过 USB 插入电脑，确保 Port 选项中显示了对应的端口号（例如 COM4 或 /dev/ttyUSB0）。\n3. ⚙️ 关键配置 (Tools 菜单) 请务必按照以下参数严格设置，否则可能导致串口无输出或摄像头初始化失败：\nUSB CDC On Boot: Enabled (关键！必须开启) PSRAM: OPI PSRAM (若无效可尝试 QSPI) Flash Mode: QIO 80MHz Flash Size: 4MB (64Mb) Partition Scheme: Huge APP (3MB No OTA/1MB SPIFFS) CPU Frequency: 240MHz (WiFi) 其他选项保持默认即可 4. 📦 环境配置 (Library Manager) 点击左侧边栏的“图书状”图标（Library Manager），搜索并安装以下库：\nArduinoWebsockets (by Gil Maimon) 注意：请认准作者 Gil Maimon。不要安装其他 WebSocket 库，否则代码中的 using namespace websockets; 会报错。 Adafruit NeoPixel (by Adafruit) 用于控制板载 RGB 灯。 关于 ESP32 开发板版本： 建议在 Board Manager 中将 ESP32 包版本固定在 2.0.17。\n3.0.x 版本 API 有重大变动，可能会提示 i2s_driver_install 报错。 如果遇到编译错误，请回退到 2.0.17 版本。 5. ⚡ 烧录与调试 点击左上角 Upload (➡️) 按钮开始烧录。 烧录完成后，打开右上角的 Serial Monitor (串口监视器)，将波特率设置为 115200。\n6. 🔧 常见问题自查 (FAQ) Q: 串口监视器什么都不显示？\nA: 检查配置中 “USB CDC On Boot” 是否已设为 Enabled。上传完成后，尝试按一下板子上的 RST (复位) 键。 Q: 报错 “Camera Init Failed”？\nA: 通常是 PSRAM 设置问题。请检查 PSRAM 选项是否为 OPI PSRAM。如果不行，尝试改为 QSPI PSRAM（取决于硬件批次）。 Q: 一直连接不上 WiFi？\nA: ESP32 仅支持 2.4GHz WiFi，不支持 5G 频段。请确认您的热点设置。 Q: 烧录成功但功能异常？\nA: 配置好后，观察串口监视器，正常情况下应能看到 “音频系统初始化完成” 和 “WiFi Connected” 的提示。 7. 🐞 报错解决 如果编译或运行过程中出现其他报错，请直接复制 Output 栏下方的红色报错信息发送给 AI，通常能快速定位问题。\n8. 📝 硬件备注 按键：板子上有两个按键，通常只关注 RST (复位/重启) 键，另一个 BOOT 键在自动烧录失败时才需要用到。 接口：板子有两个 USB 接口，请插 右边 (标记为 USB) 的接口进行烧录和供电。 服务端代码（参考） 代码块 import asyncio import websockets import cv2 import numpy as np import pyaudio # ================= 配置区 ================= HOST = \"0.0.0.0\" PORT = 8888 # ================= 协议定义 (与 ESP32 保持一致) ================= HEADER_VIDEO = 0x01 HEADER_AUDIO = 0x02 # ================= 音频配置 ================= # ESP32 发送的是: 16000Hz, 16-bit (2 bytes), 单声道 FORMAT = pyaudio.paInt16 CHANNELS = 1 RATE = 16000 CHUNK = 1024 async def stream_handler(websocket): print(f\"[Server] 客户端已连接: {websocket.remote_address}\") # 1. 初始化音频播放对象 p = pyaudio.PyAudio() # 打开音频流 (Output 模式) stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK) print(\"[Server] 音频流已初始化，准备接收数据...\") try: async for message in websocket: # 2. 接收二进制数据 if isinstance(message, bytes): if len(message) \u003c 2: continue # 数据太短，忽略 # === 核心逻辑: 解析包头 === header = message[0] # 获取第1个字节 (协议头) payload = message[1:] # 获取剩余数据 (有效负载) # --- 情况 A: 视频数据 --- if header == HEADER_VIDEO: nparr = np.frombuffer(payload, np.uint8) frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR) if frame is not None: # 可选: 翻转一下，防止自拍镜像 # frame = cv2.flip(frame, 1) cv2.imshow(\"ESP32-S3 Live Stream\", frame) if cv2.waitKey(1) \u0026 0xFF == ord('q'): break # --- 情况 B: 音频数据 --- elif header == HEADER_AUDIO: # 直接写入声卡播放 # 注意: 为了不阻塞 EventLoop，这里的数据包最好不要太大 stream.write(payload) # print(\".\", end=\"\", flush=True) # 打印个点表示收到音频 else: print(f\"[Text] 收到文本: {message}\") except websockets.exceptions.ConnectionClosed: print(\"\\n[Server] 客户端断开连接\") except Exception as e: print(f\"\\n[Error] {e}\") finally: # 清理资源 print(\"[Server] 清理资源...\") stream.stop_stream() stream.close() p.terminate() cv2.destroyAllWindows() async def main(): print(f\"=== AI Glass Server (Video + Audio) ===\") print(f\"监听地址: ws://{HOST}:{PORT}\") async with websockets.serve(stream_handler, HOST, PORT): await asyncio.Future() # 永久运行 if __name__ == \"__main__\": try: asyncio.run(main()) except KeyboardInterrupt: print(\"停止服务\") 📝 测试与说明 推流性能实测： 经局域网环境测试，ESP32 能够稳定地将视频流（MJPEG）和音频流（PCM）传输至电脑端，延迟较低且无明显卡顿，满足实时识别的基础要求。\n关于语音输出： 代码中已预留了音频下发逻辑。若需测试双向对讲或 TTS 播报，请确保在硬件端已正确连接 MAX98357A 功放模块与 8Ω 喇叭，理论上服务端发送 PCM 数据即可直接播放。\n⚠️ 注意： 本文提供的服务端代码（Python）主要用于验证硬件通路与协议可行性。\n🚀 总结与下一步 至此，我们已经完成了“AI 视障眼镜”的 躯体构建：\n硬件层：基于 ESP32-S3 搭建了具备视觉（摄像头）和听觉（麦克风/喇叭）的物理终端。 驱动层：实现了 I2S 音频采样与 Camera 视频流的同步获取。 传输层：打通了设备到服务器的 WebSocket 高速数据通路。 但是，现在的眼镜还只是一个“远程摄像头”，它还没有“大脑”。\n在下一篇文章中，我们将进入核心的 AI 算法篇，讲解如何在服务端接入：\nYOLOv8：让眼镜“看懂”面前是红绿灯、斑马线还是台阶。 多模态 LLM：让眼镜能够用自然语言描述周围的环境（例如：“前方五米有一辆共享单车挡路，请向左绕行”）。 敬请期待！\n",
+  "wordCount" : "1150",
+  "inLanguage": "en",
+  "datePublished": "2026-02-04T14:30:00+08:00",
+  "dateModified": "2026-02-04T14:30:00+08:00",
+  "author":{
+    "@type": "Person",
+    "name": "Wave-CB"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://wave-cb.github.io/projects/aiglass_%E7%A1%AC%E4%BB%B6%E8%AE%BE%E8%AE%A1/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "wave's blog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://wave-cb.github.io/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+<body id="top">
+    <header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="https://wave-cb.github.io/" accesskey="h" title="wave&#39;s blog (Alt + H)">wave&#39;s blog</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)" aria-label="Toggle theme">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <ul id="menu">
+            <li>
+                <a href="https://wave-cb.github.io/" title="首页">
+                    <span>首页</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://wave-cb.github.io/projects/" title="🛠️ 项目">
+                    <span>🛠️ 项目</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://wave-cb.github.io/learning/" title="📚 学习">
+                    <span>📚 学习</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://wave-cb.github.io/tools/" title="🔧 工具">
+                    <span>🔧 工具</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://wave-cb.github.io/archives/" title="⏱️ 归档">
+                    <span>⏱️ 归档</span>
+                </a>
+            </li>
+            <li>
+                <a href="https://wave-cb.github.io/search/" title="🔍 搜索 (Alt &#43; /)" accesskey=/>
+                    <span>🔍 搜索</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="https://wave-cb.github.io/">Home</a>&nbsp;»&nbsp;<a href="https://wave-cb.github.io/projects/">🛠️ 项目</a></div>
+    <h1 class="post-title entry-hint-parent">
+      👓 AI视障眼镜的硬件设计
+    </h1>
+    <div class="post-meta"><span title='2026-02-04 14:30:00 +0800 CST'>February 4, 2026</span>&nbsp;·&nbsp;<span>6 min</span>&nbsp;·&nbsp;<span>1150 words</span>&nbsp;·&nbsp;<span>Wave-CB</span>
+
+</div>
+  </header> <div class="toc">
+    <details  open>
+        <summary accesskey="c" title="(Alt + C)">
+            <span class="details">Table of Contents</span>
+        </summary>
+
+        <div class="inner"><ul>
+                <li>
+                    <a href="#-%e7%a1%ac%e4%bb%b6%e6%9e%b6%e6%9e%84" aria-label="🛠️ 硬件架构">🛠️ 硬件架构</a><ul>
+                        
+                <li>
+                    <a href="#%e6%a0%b8%e5%bf%83%e6%b8%85%e5%8d%95" aria-label="核心清单">核心清单</a></li>
+                <li>
+                    <a href="#%e5%bc%95%e8%84%9a%e5%ae%9a%e4%b9%89" aria-label="引脚定义">引脚定义</a></li></ul>
+                </li>
+                <li>
+                    <a href="#%e9%a9%b1%e5%8a%a8%e4%bb%a3%e7%a0%81" aria-label="驱动代码">驱动代码</a><ul>
+                        
+                <li>
+                    <a href="#%e4%bb%a3%e7%a0%81%e5%9d%97" aria-label="代码块">代码块</a></li>
+                <li>
+                    <a href="#-%e4%bd%bf%e7%94%a8%e8%af%b4%e6%98%8e" aria-label="📖 使用说明">📖 使用说明</a><ul>
+                        
+                <li>
+                    <a href="#1-%e5%88%9b%e5%bb%ba%e5%b7%a5%e7%a8%8b" aria-label="1. 创建工程">1. 创建工程</a></li>
+                <li>
+                    <a href="#2-%e7%a1%ac%e4%bb%b6%e8%bf%9e%e6%8e%a5" aria-label="2. 硬件连接">2. 硬件连接</a></li>
+                <li>
+                    <a href="#3--%e5%85%b3%e9%94%ae%e9%85%8d%e7%bd%ae-tools-%e8%8f%9c%e5%8d%95" aria-label="3. ⚙️ 关键配置 (Tools 菜单)">3. ⚙️ 关键配置 (Tools 菜单)</a></li>
+                <li>
+                    <a href="#4--%e7%8e%af%e5%a2%83%e9%85%8d%e7%bd%ae-library-manager" aria-label="4. 📦 环境配置 (Library Manager)">4. 📦 环境配置 (Library Manager)</a></li>
+                <li>
+                    <a href="#5--%e7%83%a7%e5%bd%95%e4%b8%8e%e8%b0%83%e8%af%95" aria-label="5. ⚡ 烧录与调试">5. ⚡ 烧录与调试</a></li>
+                <li>
+                    <a href="#6--%e5%b8%b8%e8%a7%81%e9%97%ae%e9%a2%98%e8%87%aa%e6%9f%a5-faq" aria-label="6. 🔧 常见问题自查 (FAQ)">6. 🔧 常见问题自查 (FAQ)</a></li>
+                <li>
+                    <a href="#7--%e6%8a%a5%e9%94%99%e8%a7%a3%e5%86%b3" aria-label="7. 🐞 报错解决">7. 🐞 报错解决</a></li>
+                <li>
+                    <a href="#8--%e7%a1%ac%e4%bb%b6%e5%a4%87%e6%b3%a8" aria-label="8. 📝 硬件备注">8. 📝 硬件备注</a></li></ul>
+                </li></ul>
+                </li>
+                <li>
+                    <a href="#%e6%9c%8d%e5%8a%a1%e7%ab%af%e4%bb%a3%e7%a0%81%e5%8f%82%e8%80%83" aria-label="服务端代码（参考）">服务端代码（参考）</a><ul>
+                        
+                <li>
+                    <a href="#%e4%bb%a3%e7%a0%81%e5%9d%97-1" aria-label="代码块">代码块</a></li>
+                <li>
+                    <a href="#-%e6%b5%8b%e8%af%95%e4%b8%8e%e8%af%b4%e6%98%8e" aria-label="📝 测试与说明">📝 测试与说明</a></li></ul>
+                </li>
+                <li>
+                    <a href="#-%e6%80%bb%e7%bb%93%e4%b8%8e%e4%b8%8b%e4%b8%80%e6%ad%a5" aria-label="🚀 总结与下一步">🚀 总结与下一步</a>
+                </li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+  <div class="post-content"><h2 id="-硬件架构">🛠️ 硬件架构<a hidden class="anchor" aria-hidden="true" href="#-硬件架构">#</a></h2>
+<h3 id="核心清单">核心清单<a hidden class="anchor" aria-hidden="true" href="#核心清单">#</a></h3>
+<ul>
+<li><strong>主控</strong>：ESP32-S3 CAM 开发板</li>
+<li><strong>麦克风</strong>：INMP441 全向麦克风</li>
+<li><strong>功放/扬声器</strong>：MAX98357A I2S 功放 + 8Ω 1W 小喇叭</li>
+<li><strong>其他</strong>：3D 打印支架、锂电池</li>
+</ul>
+<h3 id="引脚定义">引脚定义<a hidden class="anchor" aria-hidden="true" href="#引脚定义">#</a></h3>
+<blockquote>
+<p><strong>注意</strong>：由于 ESP32 引脚复用（例如 GPIO 42 和 GND），在设计验证阶段建议使用面包板扩展引脚，验证无误后进行焊接集成。</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-text" data-lang="text"><span style="display:flex;"><span>[ ESP32-S3 开发板 ]
+</span></span><span style="display:flex;"><span>             |
+</span></span><span style="display:flex;"><span>             +---- 3.3V ---------&gt; [INMP441 VDD]
+</span></span><span style="display:flex;"><span>             +---- GND ----------+-&gt; [INMP441 GND] &amp; [L/R]
+</span></span><span style="display:flex;"><span>             |                   |
+</span></span><span style="display:flex;"><span>             +---- 5V (VBUS) ----+-&gt; [MAX98357 Vin]
+</span></span><span style="display:flex;"><span>             |                   |
+</span></span><span style="display:flex;"><span>             +---- GND ----------+-&gt; [MAX98357 GND]
+</span></span><span style="display:flex;"><span>             |
+</span></span><span style="display:flex;"><span>   [数据线]
+</span></span><span style="display:flex;"><span>   GPIO 39 &lt;---------------------- [INMP441 SD]
+</span></span><span style="display:flex;"><span>   GPIO 40 ----------------------&gt; [MAX98357 DIN]
+</span></span><span style="display:flex;"><span>   
+</span></span><span style="display:flex;"><span>   [时钟线 - 关键！这里要分叉]
+</span></span><span style="display:flex;"><span>   GPIO 41 ------------------+---&gt; [INMP441 SCK]
+</span></span><span style="display:flex;"><span>                             |
+</span></span><span style="display:flex;"><span>                             +---&gt; [MAX98357 BCLK]
+</span></span><span style="display:flex;"><span>                             
+</span></span><span style="display:flex;"><span>   GPIO 42 ------------------+---&gt; [INMP441 WS]
+</span></span><span style="display:flex;"><span>                             |
+</span></span><span style="display:flex;"><span>                             +---&gt; [MAX98357 LRC]
+</span></span></code></pre></div><h2 id="驱动代码">驱动代码<a hidden class="anchor" aria-hidden="true" href="#驱动代码">#</a></h2>
+<h3 id="代码块">代码块<a hidden class="anchor" aria-hidden="true" href="#代码块">#</a></h3>
+<p>compile.ino</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c++" data-lang="c++"><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&#34;esp_camera.h&#34;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;WiFi.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;ArduinoWebsockets.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;Adafruit_NeoPixel.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;driver/i2s.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">using</span> <span style="color:#66d9ef">namespace</span> websockets;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// ================= 配置区 =================
+</span></span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span><span style="color:#f92672">*</span> ssid <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;502&#34;</span>;            
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span><span style="color:#f92672">*</span> password <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;sxz20220121&#34;</span>; 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span><span style="color:#f92672">*</span> websocket_server_host <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;192.168.1.101&#34;</span>; 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">uint16_t</span> websocket_server_port <span style="color:#f92672">=</span> <span style="color:#ae81ff">8888</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// ================= RGB 灯配置 =================
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define RGB_BUILTIN_PIN  48  
+</span></span></span><span style="display:flex;"><span>Adafruit_NeoPixel <span style="color:#a6e22e">strip</span>(<span style="color:#ae81ff">1</span>, RGB_BUILTIN_PIN, NEO_GRB <span style="color:#f92672">+</span> NEO_KHZ800);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// ================= 摄像头引脚 (保持不变) =================
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define PWDN_GPIO_NUM     -1
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define RESET_GPIO_NUM    -1
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define XCLK_GPIO_NUM     15
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define SIOD_GPIO_NUM     4
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define SIOC_GPIO_NUM     5
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y9_GPIO_NUM       16
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y8_GPIO_NUM       17
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y7_GPIO_NUM       18
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y6_GPIO_NUM       12
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y5_GPIO_NUM       10
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y4_GPIO_NUM       8
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y3_GPIO_NUM       9
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define Y2_GPIO_NUM       11
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define VSYNC_GPIO_NUM    6
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define HREF_GPIO_NUM     7
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define PCLK_GPIO_NUM     13
+</span></span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// ================= 音频 I2S 引脚 (保持不变) =================
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define I2S_WS          42
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define I2S_SD          40 </span><span style="color:#75715e">// 功放输入 (DIN)
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define I2S_SD_IN       39 </span><span style="color:#75715e">// 麦克风输出 (SD)
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define I2S_SCK         41
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define I2S_PORT        I2S_NUM_0
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define SAMPLE_RATE     16000 
+</span></span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>WebsocketsClient client;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// ================= 全局变量 =================
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// 音频缓冲区：增加到 1024 字节以减少发送频率，提高网络效率
+</span></span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">int</span> i2s_buffer_len <span style="color:#f92672">=</span> <span style="color:#ae81ff">1024</span>;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int16_t</span> sBuffer[i2s_buffer_len]; 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// 数据包头定义
+</span></span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">uint8_t</span> HEADER_VIDEO <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x01</span>;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">const</span> <span style="color:#66d9ef">uint8_t</span> HEADER_AUDIO <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x02</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// --- I2S 初始化函数 ---
+</span></span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">setupAudio</span>() {
+</span></span><span style="display:flex;"><span>  i2s_config_t i2s_config <span style="color:#f92672">=</span> {
+</span></span><span style="display:flex;"><span>    .mode <span style="color:#f92672">=</span> (i2s_mode_t)(I2S_MODE_MASTER <span style="color:#f92672">|</span> I2S_MODE_TX <span style="color:#f92672">|</span> I2S_MODE_RX),
+</span></span><span style="display:flex;"><span>    .sample_rate <span style="color:#f92672">=</span> SAMPLE_RATE,
+</span></span><span style="display:flex;"><span>    .bits_per_sample <span style="color:#f92672">=</span> I2S_BITS_PER_SAMPLE_16BIT,
+</span></span><span style="display:flex;"><span>    .channel_format <span style="color:#f92672">=</span> I2S_CHANNEL_FMT_ONLY_LEFT,
+</span></span><span style="display:flex;"><span>    .communication_format <span style="color:#f92672">=</span> I2S_COMM_FORMAT_STAND_I2S,
+</span></span><span style="display:flex;"><span>    .intr_alloc_flags <span style="color:#f92672">=</span> ESP_INTR_FLAG_LEVEL1,
+</span></span><span style="display:flex;"><span>    .dma_buf_count <span style="color:#f92672">=</span> <span style="color:#ae81ff">8</span>,
+</span></span><span style="display:flex;"><span>    .dma_buf_len <span style="color:#f92672">=</span> <span style="color:#ae81ff">64</span>,
+</span></span><span style="display:flex;"><span>    .use_apll <span style="color:#f92672">=</span> false,
+</span></span><span style="display:flex;"><span>    .tx_desc_auto_clear <span style="color:#f92672">=</span> true,
+</span></span><span style="display:flex;"><span>    .fixed_mclk <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>  };
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  i2s_pin_config_t pin_config <span style="color:#f92672">=</span> {
+</span></span><span style="display:flex;"><span>    .bck_io_num <span style="color:#f92672">=</span> I2S_SCK,
+</span></span><span style="display:flex;"><span>    .ws_io_num <span style="color:#f92672">=</span> I2S_WS,
+</span></span><span style="display:flex;"><span>    .data_out_num <span style="color:#f92672">=</span> I2S_SD,   
+</span></span><span style="display:flex;"><span>    .data_in_num <span style="color:#f92672">=</span> I2S_SD_IN  
+</span></span><span style="display:flex;"><span>  };
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (i2s_driver_install(I2S_PORT, <span style="color:#f92672">&amp;</span>i2s_config, <span style="color:#ae81ff">0</span>, NULL) <span style="color:#f92672">!=</span> ESP_OK) <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (i2s_set_pin(I2S_PORT, <span style="color:#f92672">&amp;</span>pin_config) <span style="color:#f92672">!=</span> ESP_OK) <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>  i2s_zero_dma_buffer(I2S_PORT);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// --- WebSocket 收到消息回调 (用于播放服务器发来的音频) ---
+</span></span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">onMessageCallback</span>(WebsocketsMessage message) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (message.isBinary()) {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// 假设服务器直接发回 PCM 音频数据
+</span></span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span><span style="color:#f92672">*</span> data <span style="color:#f92672">=</span> message.c_str();
+</span></span><span style="display:flex;"><span>        size_t len <span style="color:#f92672">=</span> message.length();
+</span></span><span style="display:flex;"><span>        size_t bytesOut;
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// 将收到的数据写入 I2S (扬声器)
+</span></span></span><span style="display:flex;"><span>        i2s_write(I2S_PORT, data, len, <span style="color:#f92672">&amp;</span>bytesOut, <span style="color:#ae81ff">0</span>); 
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">setup</span>() {
+</span></span><span style="display:flex;"><span>  Serial.begin(<span style="color:#ae81ff">115200</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 1. 关灯
+</span></span></span><span style="display:flex;"><span>  strip.begin();
+</span></span><span style="display:flex;"><span>  strip.setBrightness(<span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>  strip.setPixelColor(<span style="color:#ae81ff">0</span>, strip.Color(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>));
+</span></span><span style="display:flex;"><span>  strip.show();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 2. 摄像头初始化
+</span></span></span><span style="display:flex;"><span>  camera_config_t config;
+</span></span><span style="display:flex;"><span>  config.ledc_channel <span style="color:#f92672">=</span> LEDC_CHANNEL_0;
+</span></span><span style="display:flex;"><span>  config.ledc_timer <span style="color:#f92672">=</span> LEDC_TIMER_0;
+</span></span><span style="display:flex;"><span>  config.pin_d0 <span style="color:#f92672">=</span> Y2_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d1 <span style="color:#f92672">=</span> Y3_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d2 <span style="color:#f92672">=</span> Y4_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d3 <span style="color:#f92672">=</span> Y5_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d4 <span style="color:#f92672">=</span> Y6_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d5 <span style="color:#f92672">=</span> Y7_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d6 <span style="color:#f92672">=</span> Y8_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_d7 <span style="color:#f92672">=</span> Y9_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_xclk <span style="color:#f92672">=</span> XCLK_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_pclk <span style="color:#f92672">=</span> PCLK_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_vsync <span style="color:#f92672">=</span> VSYNC_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_href <span style="color:#f92672">=</span> HREF_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_sccb_sda <span style="color:#f92672">=</span> SIOD_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_sccb_scl <span style="color:#f92672">=</span> SIOC_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_pwdn <span style="color:#f92672">=</span> PWDN_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.pin_reset <span style="color:#f92672">=</span> RESET_GPIO_NUM;
+</span></span><span style="display:flex;"><span>  config.xclk_freq_hz <span style="color:#f92672">=</span> <span style="color:#ae81ff">10000000</span>; 
+</span></span><span style="display:flex;"><span>  config.frame_size <span style="color:#f92672">=</span> FRAMESIZE_QVGA; 
+</span></span><span style="display:flex;"><span>  config.pixel_format <span style="color:#f92672">=</span> PIXFORMAT_JPEG; 
+</span></span><span style="display:flex;"><span>  config.grab_mode <span style="color:#f92672">=</span> CAMERA_GRAB_LATEST; 
+</span></span><span style="display:flex;"><span>  config.fb_location <span style="color:#f92672">=</span> CAMERA_FB_IN_PSRAM;
+</span></span><span style="display:flex;"><span>  config.jpeg_quality <span style="color:#f92672">=</span> <span style="color:#ae81ff">30</span>; 
+</span></span><span style="display:flex;"><span>  config.fb_count <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (esp_camera_init(<span style="color:#f92672">&amp;</span>config) <span style="color:#f92672">!=</span> ESP_OK) {
+</span></span><span style="display:flex;"><span>    Serial.println(<span style="color:#e6db74">&#34;Cam Fail&#34;</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 3. 初始化音频
+</span></span></span><span style="display:flex;"><span>  setupAudio();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 4. WiFi
+</span></span></span><span style="display:flex;"><span>  WiFi.mode(WIFI_STA);
+</span></span><span style="display:flex;"><span>  WiFi.begin(ssid, password);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> (WiFi.status() <span style="color:#f92672">!=</span> WL_CONNECTED) {
+</span></span><span style="display:flex;"><span>    delay(<span style="color:#ae81ff">500</span>);
+</span></span><span style="display:flex;"><span>    Serial.print(<span style="color:#e6db74">&#34;.&#34;</span>);
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 注册回调接收服务器音频
+</span></span></span><span style="display:flex;"><span>  client.onMessage(onMessageCallback);
+</span></span><span style="display:flex;"><span>  client.connect(websocket_server_host, websocket_server_port, <span style="color:#e6db74">&#34;/&#34;</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">loop</span>() {
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 保持 WebSocket 活跃
+</span></span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (client.available()) {
+</span></span><span style="display:flex;"><span>      client.poll();
+</span></span><span style="display:flex;"><span>  } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>      delay(<span style="color:#ae81ff">500</span>);
+</span></span><span style="display:flex;"><span>      client.connect(websocket_server_host, websocket_server_port, <span style="color:#e6db74">&#34;/&#34;</span>);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// ================= 任务 A: 发送音频 (高优先级) =================
+</span></span></span><span style="display:flex;"><span>  size_t bytesIn <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 尝试非阻塞读取麦克风数据
+</span></span></span><span style="display:flex;"><span>  esp_err_t result <span style="color:#f92672">=</span> i2s_read(I2S_PORT, <span style="color:#f92672">&amp;</span>sBuffer, i2s_buffer_len <span style="color:#f92672">*</span> <span style="color:#66d9ef">sizeof</span>(<span style="color:#66d9ef">int16_t</span>), <span style="color:#f92672">&amp;</span>bytesIn, <span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (result <span style="color:#f92672">==</span> ESP_OK <span style="color:#f92672">&amp;&amp;</span> bytesIn <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// 创建数据包: [1字节类型头] + [PCM数据]
+</span></span></span><span style="display:flex;"><span>      <span style="color:#75715e">// 动态分配内存以合并头和数据 (ESP32有足够RAM处理这个小包)
+</span></span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span> payload <span style="color:#f92672">=</span> <span style="color:#66d9ef">new</span> <span style="color:#66d9ef">uint8_t</span>[bytesIn <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>];
+</span></span><span style="display:flex;"><span>      payload[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> HEADER_AUDIO; <span style="color:#75715e">// 标记为音频
+</span></span></span><span style="display:flex;"><span>      memcpy(payload <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>, sBuffer, bytesIn);
+</span></span><span style="display:flex;"><span>      
+</span></span><span style="display:flex;"><span>      client.sendBinary((<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span><span style="color:#f92672">*</span>)payload, bytesIn <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">delete</span>[] payload; <span style="color:#75715e">// 记得释放内存
+</span></span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// ================= 任务 B: 发送视频 (低优先级) =================
+</span></span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">static</span> <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">long</span> lastVideoTime <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// 控制帧率为 10FPS (100ms间隔)，给音频留出带宽
+</span></span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (millis() <span style="color:#f92672">-</span> lastVideoTime <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">100</span>) { 
+</span></span><span style="display:flex;"><span>      camera_fb_t <span style="color:#f92672">*</span> fb <span style="color:#f92672">=</span> esp_camera_fb_get();
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (fb) {
+</span></span><span style="display:flex;"><span>          <span style="color:#75715e">// 创建数据包: [1字节类型头] + [JPEG数据]
+</span></span></span><span style="display:flex;"><span>          <span style="color:#75715e">// 注意：视频数据较大，频繁 malloc 可能会导致碎片，但ArduinoWebsockets不支持分段发送
+</span></span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span> videoPayload <span style="color:#f92672">=</span> <span style="color:#66d9ef">new</span> <span style="color:#66d9ef">uint8_t</span>[fb<span style="color:#f92672">-&gt;</span>len <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>];
+</span></span><span style="display:flex;"><span>          videoPayload[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> HEADER_VIDEO; <span style="color:#75715e">// 标记为视频
+</span></span></span><span style="display:flex;"><span>          memcpy(videoPayload <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>, fb<span style="color:#f92672">-&gt;</span>buf, fb<span style="color:#f92672">-&gt;</span>len);
+</span></span><span style="display:flex;"><span>          
+</span></span><span style="display:flex;"><span>          client.sendBinary((<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span><span style="color:#f92672">*</span>)videoPayload, fb<span style="color:#f92672">-&gt;</span>len <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">delete</span>[] videoPayload;
+</span></span><span style="display:flex;"><span>          
+</span></span><span style="display:flex;"><span>          esp_camera_fb_return(fb);
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      lastVideoTime <span style="color:#f92672">=</span> millis();
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><h3 id="-使用说明">📖 使用说明<a hidden class="anchor" aria-hidden="true" href="#-使用说明">#</a></h3>
+<h4 id="1-创建工程">1. 创建工程<a hidden class="anchor" aria-hidden="true" href="#1-创建工程">#</a></h4>
+<p>打开 Arduino IDE，点击左上角菜单栏 <code>File</code> -&gt; <code>New Sketch</code>，将文件命名为 <code>compile.ino</code>，并将上述驱动代码完整复制进去。</p>
+<h4 id="2-硬件连接">2. 硬件连接<a hidden class="anchor" aria-hidden="true" href="#2-硬件连接">#</a></h4>
+<p>点击菜单栏 <code>Tools</code>，在 <strong>Board</strong> 选项中选择 <code>esp32</code> -&gt; <code>ESP32S3 Dev Module</code>。
+此时将单片机通过 USB 插入电脑，确保 <strong>Port</strong> 选项中显示了对应的端口号（例如 <code>COM4</code> 或 <code>/dev/ttyUSB0</code>）。</p>
+<h4 id="3--关键配置-tools-菜单">3. ⚙️ 关键配置 (Tools 菜单)<a hidden class="anchor" aria-hidden="true" href="#3--关键配置-tools-菜单">#</a></h4>
+<p>请务必按照以下参数严格设置，否则可能导致串口无输出或摄像头初始化失败：</p>
+<ul>
+<li><strong>USB CDC On Boot</strong>: <code>Enabled</code> <!-- raw HTML omitted -->(关键！必须开启)<!-- raw HTML omitted --></li>
+<li><strong>PSRAM</strong>: <code>OPI PSRAM</code> (若无效可尝试 QSPI)</li>
+<li><strong>Flash Mode</strong>: <code>QIO 80MHz</code></li>
+<li><strong>Flash Size</strong>: <code>4MB (64Mb)</code></li>
+<li><strong>Partition Scheme</strong>: <code>Huge APP (3MB No OTA/1MB SPIFFS)</code></li>
+<li><strong>CPU Frequency</strong>: <code>240MHz (WiFi)</code></li>
+<li><em>其他选项保持默认即可</em></li>
+</ul>
+<h4 id="4--环境配置-library-manager">4. 📦 环境配置 (Library Manager)<a hidden class="anchor" aria-hidden="true" href="#4--环境配置-library-manager">#</a></h4>
+<p>点击左侧边栏的“图书状”图标（Library Manager），搜索并安装以下库：</p>
+<ol>
+<li><strong>ArduinoWebsockets</strong> (by <strong>Gil Maimon</strong>)
+<ul>
+<li><strong>注意</strong>：请认准作者 Gil Maimon。不要安装其他 WebSocket 库，否则代码中的 <code>using namespace websockets;</code> 会报错。</li>
+</ul>
+</li>
+<li><strong>Adafruit NeoPixel</strong> (by <strong>Adafruit</strong>)
+<ul>
+<li>用于控制板载 RGB 灯。</li>
+</ul>
+</li>
+</ol>
+<p><strong>关于 ESP32 开发板版本</strong>：
+建议在 Board Manager 中将 ESP32 包版本固定在 <strong>2.0.17</strong>。</p>
+<ul>
+<li>3.0.x 版本 API 有重大变动，可能会提示 <code>i2s_driver_install</code> 报错。</li>
+<li>如果遇到编译错误，请回退到 2.0.17 版本。</li>
+</ul>
+<h4 id="5--烧录与调试">5. ⚡ 烧录与调试<a hidden class="anchor" aria-hidden="true" href="#5--烧录与调试">#</a></h4>
+<p>点击左上角 <strong>Upload</strong> (➡️) 按钮开始烧录。
+烧录完成后，打开右上角的 <strong>Serial Monitor</strong> (串口监视器)，将波特率设置为 <code>115200</code>。</p>
+<h4 id="6--常见问题自查-faq">6. 🔧 常见问题自查 (FAQ)<a hidden class="anchor" aria-hidden="true" href="#6--常见问题自查-faq">#</a></h4>
+<ul>
+<li>
+<p><strong>Q: 串口监视器什么都不显示？</strong></p>
+<ul>
+<li><strong>A</strong>: 检查配置中 &ldquo;USB CDC On Boot&rdquo; 是否已设为 <code>Enabled</code>。上传完成后，尝试按一下板子上的 <strong>RST</strong> (复位) 键。</li>
+</ul>
+</li>
+<li>
+<p><strong>Q: 报错 &ldquo;Camera Init Failed&rdquo;？</strong></p>
+<ul>
+<li><strong>A</strong>: 通常是 PSRAM 设置问题。请检查 <strong>PSRAM</strong> 选项是否为 <code>OPI PSRAM</code>。如果不行，尝试改为 <code>QSPI PSRAM</code>（取决于硬件批次）。</li>
+</ul>
+</li>
+<li>
+<p><strong>Q: 一直连接不上 WiFi？</strong></p>
+<ul>
+<li><strong>A</strong>: ESP32 仅支持 <strong>2.4GHz</strong> WiFi，不支持 5G 频段。请确认您的热点设置。</li>
+</ul>
+</li>
+<li>
+<p><strong>Q: 烧录成功但功能异常？</strong></p>
+<ul>
+<li><strong>A</strong>: 配置好后，观察串口监视器，正常情况下应能看到 &ldquo;音频系统初始化完成&rdquo; 和 &ldquo;WiFi Connected&rdquo; 的提示。</li>
+</ul>
+</li>
+</ul>
+<h4 id="7--报错解决">7. 🐞 报错解决<a hidden class="anchor" aria-hidden="true" href="#7--报错解决">#</a></h4>
+<p>如果编译或运行过程中出现其他报错，请直接复制 <code>Output</code> 栏下方的红色报错信息发送给 AI，通常能快速定位问题。</p>
+<h4 id="8--硬件备注">8. 📝 硬件备注<a hidden class="anchor" aria-hidden="true" href="#8--硬件备注">#</a></h4>
+<ul>
+<li><strong>按键</strong>：板子上有两个按键，通常只关注 <strong>RST</strong> (复位/重启) 键，另一个 BOOT 键在自动烧录失败时才需要用到。</li>
+<li><strong>接口</strong>：板子有两个 USB 接口，请插 <strong>右边</strong> (标记为 USB) 的接口进行烧录和供电。</li>
+</ul>
+<h2 id="服务端代码参考">服务端代码（参考）<a hidden class="anchor" aria-hidden="true" href="#服务端代码参考">#</a></h2>
+<h3 id="代码块-1">代码块<a hidden class="anchor" aria-hidden="true" href="#代码块-1">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span>    <span style="color:#f92672">import</span> asyncio
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> websockets
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> cv2
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> numpy <span style="color:#66d9ef">as</span> np
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> pyaudio
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ================= 配置区 =================</span>
+</span></span><span style="display:flex;"><span>HOST <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;0.0.0.0&#34;</span>
+</span></span><span style="display:flex;"><span>PORT <span style="color:#f92672">=</span> <span style="color:#ae81ff">8888</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ================= 协议定义 (与 ESP32 保持一致) =================</span>
+</span></span><span style="display:flex;"><span>HEADER_VIDEO <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x01</span>
+</span></span><span style="display:flex;"><span>HEADER_AUDIO <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x02</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ================= 音频配置 =================</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ESP32 发送的是: 16000Hz, 16-bit (2 bytes), 单声道</span>
+</span></span><span style="display:flex;"><span>FORMAT <span style="color:#f92672">=</span> pyaudio<span style="color:#f92672">.</span>paInt16
+</span></span><span style="display:flex;"><span>CHANNELS <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>RATE <span style="color:#f92672">=</span> <span style="color:#ae81ff">16000</span>
+</span></span><span style="display:flex;"><span>CHUNK <span style="color:#f92672">=</span> <span style="color:#ae81ff">1024</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">async</span> <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">stream_handler</span>(websocket):
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;[Server] 客户端已连接: </span><span style="color:#e6db74">{</span>websocket<span style="color:#f92672">.</span>remote_address<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 1. 初始化音频播放对象</span>
+</span></span><span style="display:flex;"><span>    p <span style="color:#f92672">=</span> pyaudio<span style="color:#f92672">.</span>PyAudio()
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># 打开音频流 (Output 模式)</span>
+</span></span><span style="display:flex;"><span>    stream <span style="color:#f92672">=</span> p<span style="color:#f92672">.</span>open(format<span style="color:#f92672">=</span>FORMAT,
+</span></span><span style="display:flex;"><span>                    channels<span style="color:#f92672">=</span>CHANNELS,
+</span></span><span style="display:flex;"><span>                    rate<span style="color:#f92672">=</span>RATE,
+</span></span><span style="display:flex;"><span>                    output<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>,
+</span></span><span style="display:flex;"><span>                    frames_per_buffer<span style="color:#f92672">=</span>CHUNK)
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;[Server] 音频流已初始化，准备接收数据...&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">try</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">async</span> <span style="color:#66d9ef">for</span> message <span style="color:#f92672">in</span> websocket:
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e"># 2. 接收二进制数据</span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> isinstance(message, bytes):
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> len(message) <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">2</span>:
+</span></span><span style="display:flex;"><span>                    <span style="color:#66d9ef">continue</span> <span style="color:#75715e"># 数据太短，忽略</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># === 核心逻辑: 解析包头 ===</span>
+</span></span><span style="display:flex;"><span>                header <span style="color:#f92672">=</span> message[<span style="color:#ae81ff">0</span>]       <span style="color:#75715e"># 获取第1个字节 (协议头)</span>
+</span></span><span style="display:flex;"><span>                payload <span style="color:#f92672">=</span> message[<span style="color:#ae81ff">1</span>:]     <span style="color:#75715e"># 获取剩余数据 (有效负载)</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># --- 情况 A: 视频数据 ---</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> header <span style="color:#f92672">==</span> HEADER_VIDEO:
+</span></span><span style="display:flex;"><span>                    nparr <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>frombuffer(payload, np<span style="color:#f92672">.</span>uint8)
+</span></span><span style="display:flex;"><span>                    frame <span style="color:#f92672">=</span> cv2<span style="color:#f92672">.</span>imdecode(nparr, cv2<span style="color:#f92672">.</span>IMREAD_COLOR)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                    <span style="color:#66d9ef">if</span> frame <span style="color:#f92672">is</span> <span style="color:#f92672">not</span> <span style="color:#66d9ef">None</span>:
+</span></span><span style="display:flex;"><span>                        <span style="color:#75715e"># 可选: 翻转一下，防止自拍镜像</span>
+</span></span><span style="display:flex;"><span>                        <span style="color:#75715e"># frame = cv2.flip(frame, 1) </span>
+</span></span><span style="display:flex;"><span>                        cv2<span style="color:#f92672">.</span>imshow(<span style="color:#e6db74">&#34;ESP32-S3 Live Stream&#34;</span>, frame)
+</span></span><span style="display:flex;"><span>                        
+</span></span><span style="display:flex;"><span>                        <span style="color:#66d9ef">if</span> cv2<span style="color:#f92672">.</span>waitKey(<span style="color:#ae81ff">1</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xFF</span> <span style="color:#f92672">==</span> ord(<span style="color:#e6db74">&#39;q&#39;</span>):
+</span></span><span style="display:flex;"><span>                            <span style="color:#66d9ef">break</span>
+</span></span><span style="display:flex;"><span>                
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e"># --- 情况 B: 音频数据 ---</span>
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">elif</span> header <span style="color:#f92672">==</span> HEADER_AUDIO:
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e"># 直接写入声卡播放</span>
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e"># 注意: 为了不阻塞 EventLoop，这里的数据包最好不要太大</span>
+</span></span><span style="display:flex;"><span>                    stream<span style="color:#f92672">.</span>write(payload)
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e"># print(&#34;.&#34;, end=&#34;&#34;, flush=True) # 打印个点表示收到音频</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">else</span>:
+</span></span><span style="display:flex;"><span>                print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;[Text] 收到文本: </span><span style="color:#e6db74">{</span>message<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">except</span> websockets<span style="color:#f92672">.</span>exceptions<span style="color:#f92672">.</span>ConnectionClosed:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">[Server] 客户端断开连接&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">except</span> <span style="color:#a6e22e">Exception</span> <span style="color:#66d9ef">as</span> e:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">[Error] </span><span style="color:#e6db74">{</span>e<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">finally</span>:
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># 清理资源</span>
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;[Server] 清理资源...&#34;</span>)
+</span></span><span style="display:flex;"><span>        stream<span style="color:#f92672">.</span>stop_stream()
+</span></span><span style="display:flex;"><span>        stream<span style="color:#f92672">.</span>close()
+</span></span><span style="display:flex;"><span>        p<span style="color:#f92672">.</span>terminate()
+</span></span><span style="display:flex;"><span>        cv2<span style="color:#f92672">.</span>destroyAllWindows()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">async</span> <span style="color:#66d9ef">def</span> <span style="color:#a6e22e">main</span>():
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;=== AI Glass Server (Video + Audio) ===&#34;</span>)
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">f</span><span style="color:#e6db74">&#34;监听地址: ws://</span><span style="color:#e6db74">{</span>HOST<span style="color:#e6db74">}</span><span style="color:#e6db74">:</span><span style="color:#e6db74">{</span>PORT<span style="color:#e6db74">}</span><span style="color:#e6db74">&#34;</span>)
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">async</span> <span style="color:#66d9ef">with</span> websockets<span style="color:#f92672">.</span>serve(stream_handler, HOST, PORT):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">await</span> asyncio<span style="color:#f92672">.</span>Future()  <span style="color:#75715e"># 永久运行</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;__main__&#34;</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">try</span>:
+</span></span><span style="display:flex;"><span>        asyncio<span style="color:#f92672">.</span>run(main())
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">except</span> <span style="color:#a6e22e">KeyboardInterrupt</span>:
+</span></span><span style="display:flex;"><span>        print(<span style="color:#e6db74">&#34;停止服务&#34;</span>)
+</span></span></code></pre></div><h3 id="-测试与说明">📝 测试与说明<a hidden class="anchor" aria-hidden="true" href="#-测试与说明">#</a></h3>
+<ul>
+<li>
+<p><strong>推流性能实测</strong>：
+经局域网环境测试，ESP32 能够稳定地将视频流（MJPEG）和音频流（PCM）传输至电脑端，<strong>延迟较低且无明显卡顿</strong>，满足实时识别的基础要求。</p>
+</li>
+<li>
+<p><strong>关于语音输出</strong>：
+代码中已预留了音频下发逻辑。若需测试双向对讲或 TTS 播报，请确保在硬件端已正确连接 <strong>MAX98357A 功放模块</strong>与 <strong>8Ω 喇叭</strong>，理论上服务端发送 PCM 数据即可直接播放。</p>
+</li>
+</ul>
+<p><strong>⚠️ 注意</strong>：
+本文提供的服务端代码（Python）主要用于<strong>验证硬件通路</strong>与协议可行性。</p>
+<hr>
+<h2 id="-总结与下一步">🚀 总结与下一步<a hidden class="anchor" aria-hidden="true" href="#-总结与下一步">#</a></h2>
+<p>至此，我们已经完成了“AI 视障眼镜”的 <strong>躯体构建</strong>：</p>
+<ol>
+<li><strong>硬件层</strong>：基于 ESP32-S3 搭建了具备视觉（摄像头）和听觉（麦克风/喇叭）的物理终端。</li>
+<li><strong>驱动层</strong>：实现了 I2S 音频采样与 Camera 视频流的同步获取。</li>
+<li><strong>传输层</strong>：打通了设备到服务器的 WebSocket 高速数据通路。</li>
+</ol>
+<p><strong>但是，现在的眼镜还只是一个“远程摄像头”，它还没有“大脑”。</strong></p>
+<p>在下一篇文章中，我们将进入核心的 <strong>AI 算法篇</strong>，讲解如何在服务端接入：</p>
+<ul>
+<li><strong>YOLOv8</strong>：让眼镜“看懂”面前是红绿灯、斑马线还是台阶。</li>
+<li><strong>多模态 LLM</strong>：让眼镜能够用自然语言描述周围的环境（例如：“<em>前方五米有一辆共享单车挡路，请向左绕行</em>”）。</li>
+</ul>
+<p>敬请期待！</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+      <li><a href="https://wave-cb.github.io/tags/%E5%B5%8C%E5%85%A5%E5%BC%8F/">嵌入式</a></li>
+      <li><a href="https://wave-cb.github.io/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E8%A7%86%E8%A7%89/">计算机视觉</a></li>
+      <li><a href="https://wave-cb.github.io/tags/esp32/">ESP32</a></li>
+      <li><a href="https://wave-cb.github.io/tags/yolo/">YOLO</a></li>
+      <li><a href="https://wave-cb.github.io/tags/llm/">LLM</a></li>
+      <li><a href="https://wave-cb.github.io/tags/cuda/">CUDA</a></li>
+    </ul>
+<nav class="paginav">
+  <a class="next" href="https://wave-cb.github.io/projects/ai-glasses/">
+    <span class="title">Next »</span>
+    <br>
+    <span>基于 ESP32 与端侧算力的AI视障眼镜</span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on x"
+            href="https://x.com/intent/tweet/?text=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1&amp;url=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f&amp;hashtags=%e5%b5%8c%e5%85%a5%e5%bc%8f%2c%e8%ae%a1%e7%ae%97%e6%9c%ba%e8%a7%86%e8%a7%89%2cESP32%2cYOLO%2cLLM%2cCUDA">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f&amp;title=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1&amp;summary=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1&amp;source=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on reddit"
+            href="https://reddit.com/submit?url=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f&title=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-3.446,265.638c0,-22.964 -18.616,-41.58 -41.58,-41.58c-11.211,0 -21.361,4.457 -28.841,11.666c-28.424,-20.508 -67.586,-33.757 -111.204,-35.278l18.941,-89.121l61.884,13.157c0.756,15.734 13.642,28.29 29.56,28.29c16.407,0 29.706,-13.299 29.706,-29.701c0,-16.403 -13.299,-29.702 -29.706,-29.702c-11.666,0 -21.657,6.792 -26.515,16.578l-69.105,-14.69c-1.922,-0.418 -3.939,-0.042 -5.585,1.036c-1.658,1.073 -2.811,2.761 -3.224,4.686l-21.152,99.438c-44.258,1.228 -84.046,14.494 -112.837,35.232c-7.468,-7.164 -17.589,-11.591 -28.757,-11.591c-22.965,0 -41.585,18.616 -41.585,41.58c0,16.896 10.095,31.41 24.568,37.918c-0.639,4.135 -0.99,8.328 -0.99,12.576c0,63.977 74.469,115.836 166.33,115.836c91.861,0 166.334,-51.859 166.334,-115.836c0,-4.218 -0.347,-8.387 -0.977,-12.493c14.564,-6.47 24.735,-21.034 24.735,-38.001Zm-119.474,108.193c-20.27,20.241 -59.115,21.816 -70.534,21.816c-11.428,0 -50.277,-1.575 -70.522,-21.82c-3.007,-3.008 -3.007,-7.882 0,-10.889c3.003,-2.999 7.882,-3.003 10.885,0c12.777,12.781 40.11,17.317 59.637,17.317c19.522,0 46.86,-4.536 59.657,-17.321c3.016,-2.999 7.886,-2.995 10.885,0.008c3.008,3.011 3.003,7.882 -0.008,10.889Zm-5.23,-48.781c-16.373,0 -29.701,-13.324 -29.701,-29.698c0,-16.381 13.328,-29.714 29.701,-29.714c16.378,0 29.706,13.333 29.706,29.714c0,16.374 -13.328,29.698 -29.706,29.698Zm-160.386,-29.702c0,-16.381 13.328,-29.71 29.714,-29.71c16.369,0 29.689,13.329 29.689,29.71c0,16.373 -13.32,29.693 -29.689,29.693c-16.386,0 -29.714,-13.32 -29.714,-29.693Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on facebook"
+            href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-106.468,0l0,-192.915l66.6,0l12.672,-82.621l-79.272,0l0,-53.617c0,-22.603 11.073,-44.636 46.58,-44.636l36.042,0l0,-70.34c0,0 -32.71,-5.582 -63.982,-5.582c-65.288,0 -107.96,39.569 -107.96,111.204l0,62.971l-72.573,0l0,82.621l72.573,0l0,192.915l-191.104,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on whatsapp"
+            href="https://api.whatsapp.com/send?text=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1%20-%20https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-58.673,127.703c-33.842,-33.881 -78.847,-52.548 -126.798,-52.568c-98.799,0 -179.21,80.405 -179.249,179.234c-0.013,31.593 8.241,62.428 23.927,89.612l-25.429,92.884l95.021,-24.925c26.181,14.28 55.659,21.807 85.658,21.816l0.074,0c98.789,0 179.206,-80.413 179.247,-179.243c0.018,-47.895 -18.61,-92.93 -52.451,-126.81Zm-126.797,275.782l-0.06,0c-26.734,-0.01 -52.954,-7.193 -75.828,-20.767l-5.441,-3.229l-56.386,14.792l15.05,-54.977l-3.542,-5.637c-14.913,-23.72 -22.791,-51.136 -22.779,-79.287c0.033,-82.142 66.867,-148.971 149.046,-148.971c39.793,0.014 77.199,15.531 105.329,43.692c28.128,28.16 43.609,65.592 43.594,105.4c-0.034,82.149 -66.866,148.983 -148.983,148.984Zm81.721,-111.581c-4.479,-2.242 -26.499,-13.075 -30.604,-14.571c-4.105,-1.495 -7.091,-2.241 -10.077,2.241c-2.986,4.483 -11.569,14.572 -14.182,17.562c-2.612,2.988 -5.225,3.364 -9.703,1.12c-4.479,-2.241 -18.91,-6.97 -36.017,-22.23c-13.314,-11.876 -22.304,-26.542 -24.916,-31.026c-2.612,-4.484 -0.279,-6.908 1.963,-9.14c2.016,-2.007 4.48,-5.232 6.719,-7.847c2.24,-2.615 2.986,-4.484 4.479,-7.472c1.493,-2.99 0.747,-5.604 -0.374,-7.846c-1.119,-2.241 -10.077,-24.288 -13.809,-33.256c-3.635,-8.733 -7.327,-7.55 -10.077,-7.688c-2.609,-0.13 -5.598,-0.158 -8.583,-0.158c-2.986,0 -7.839,1.121 -11.944,5.604c-4.105,4.484 -15.675,15.32 -15.675,37.364c0,22.046 16.048,43.342 18.287,46.332c2.24,2.99 31.582,48.227 76.511,67.627c10.685,4.615 19.028,7.371 25.533,9.434c10.728,3.41 20.492,2.929 28.209,1.775c8.605,-1.285 26.499,-10.833 30.231,-21.295c3.732,-10.464 3.732,-19.431 2.612,-21.298c-1.119,-1.869 -4.105,-2.99 -8.583,-5.232Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on telegram"
+            href="https://telegram.me/share/url?text=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1&amp;url=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f">
+            <svg version="1.1" xml:space="preserve" viewBox="2 2 28 28" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M26.49,29.86H5.5a3.37,3.37,0,0,1-2.47-1,3.35,3.35,0,0,1-1-2.47V5.48A3.36,3.36,0,0,1,3,3,3.37,3.37,0,0,1,5.5,2h21A3.38,3.38,0,0,1,29,3a3.36,3.36,0,0,1,1,2.46V26.37a3.35,3.35,0,0,1-1,2.47A3.38,3.38,0,0,1,26.49,29.86Zm-5.38-6.71a.79.79,0,0,0,.85-.66L24.73,9.24a.55.55,0,0,0-.18-.46.62.62,0,0,0-.41-.17q-.08,0-16.53,6.11a.59.59,0,0,0-.41.59.57.57,0,0,0,.43.52l4,1.24,1.61,4.83a.62.62,0,0,0,.63.43.56.56,0,0,0,.4-.17L16.54,20l4.09,3A.9.9,0,0,0,21.11,23.15ZM13.8,20.71l-1.21-4q8.72-5.55,8.78-5.55c.15,0,.23,0,.23.16a.18.18,0,0,1,0,.06s-2.51,2.3-7.52,6.8Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share 👓 AI视障眼镜的硬件设计 on ycombinator"
+            href="https://news.ycombinator.com/submitlink?t=%f0%9f%91%93%20AI%e8%a7%86%e9%9a%9c%e7%9c%bc%e9%95%9c%e7%9a%84%e7%a1%ac%e4%bb%b6%e8%ae%be%e8%ae%a1&u=https%3a%2f%2fwave-cb.github.io%2fprojects%2faiglass_%25E7%25A1%25AC%25E4%25BB%25B6%25E8%25AE%25BE%25E8%25AE%25A1%2f">
+            <svg version="1.1" xml:space="preserve" width="30px" height="30px" viewBox="0 0 512 512" fill="currentColor"
+                xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+                <path
+                    d="M449.446 0C483.971 0 512 28.03 512 62.554L512 449.446C512 483.97 483.97 512 449.446 512L62.554 512C28.03 512 0 483.97 0 449.446L0 62.554C0 28.03 28.029 0 62.554 0L449.446 0ZM183.8767 87.9921H121.8427L230.6673 292.4508V424.0079H281.3328V292.4508L390.1575 87.9921H328.1233L256 238.2489z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+        <span>&copy; 2026 <a href="https://wave-cb.github.io/">wave&#39;s blog</a></span> · 
+
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu');
+    if (menu) {
+        
+        const scrollPosition = localStorage.getItem("menu-scroll-position");
+        if (scrollPosition) {
+            menu.scrollLeft = parseInt(scrollPosition, 10);
+        }
+        
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        const html = document.querySelector("html");
+        if (html.dataset.theme === "dark") {
+            html.dataset.theme = 'light';
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            html.dataset.theme = 'dark';
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>
